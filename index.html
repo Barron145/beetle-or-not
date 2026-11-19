@@ -16,26 +16,32 @@
     --sky:#06b6d4;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{
+    height:100%;
+    overflow:hidden; /* app-style: no scrolling; buttons navigate between screens */
+  }
   body{
     font-family:'Segoe UI',Verdana,Arial,sans-serif;
     background:var(--jungle-deep);
     color:var(--cream);
-    min-height:100vh;
   }
   /* ---------- SCREEN (full-width stacked region) ---------- */
   .screen{
-    position:relative;
-    min-height:100vh;
+    position:fixed;inset:0;      /* each screen fills the viewport exactly */
+    z-index:1;
+    display:none;                /* one screen visible at a time */
+    height:100%;
     padding:32px 20px 48px;
-    display:flex;
     flex-direction:column;
     align-items:center;
+    justify-content:center;      /* center content vertically */
     transition:background .4s;
   }
-  .screen.active{outline:none;}
+  .screen.active{display:flex;}
   #screen-menu{background:radial-gradient(circle at 20% 15%, #1a7a3c 0%, var(--jungle-deep) 60%);}
   #screen-game{background:radial-gradient(circle at 80% 10%, #166534 0%, #052e16 70%);}
   #screen-about{background:radial-gradient(circle at 30% 80%, #155e75 0%, #0b3d1e 65%);}
+  #screen-leaderboard{background:radial-gradient(circle at 70% 80%, #14532d 0%, #052e16 70%);}
 
   .leaf{font-size:1.6rem;margin-bottom:8px;}
   h1{
@@ -49,9 +55,9 @@
 
   /* ---------- MAIN MENU ---------- */
   .top-score-corner{
-    position:absolute;top:14px;right:18px;
     font-size:.95rem;color:var(--accent);
-    background:rgba(0,0,0,.35);padding:8px 14px;border-radius:999px;
+    background:rgba(0,0,0,.35);padding:8px 18px;border-radius:999px;
+    margin-bottom:6px;
   }
   .menu-buttons{margin-top:48px;display:flex;flex-direction:column;gap:18px;width:min(320px,90vw);}
   .big-btn{
@@ -66,10 +72,20 @@
   .big-btn.about:active{box-shadow:0 2px 0 #a16207;}
   .big-btn.exit{background:var(--danger);color:#fff;box-shadow:0 6px 0 #7f1d1d;}
   .big-btn.exit:active{box-shadow:0 2px 0 #7f1d1d;}
+  .big-btn.lb{background:#fbbf24;box-shadow:0 6px 0 #92400e;}
+  .big-btn.lb:active{box-shadow:0 2px 0 #92400e;}
   .exit-note{
     margin-top:16px;font-size:.95rem;color:#fca5a5;min-height:1.4em;
     max-width:min(420px,90vw);text-align:center;
   }
+  .leaderboard{
+    margin-top:40px;background:#0e3b20;border:2px solid var(--accent);
+    border-radius:16px;padding:22px 30px;width:min(360px,90vw);
+  }
+  .lb-title{color:var(--accent);font-weight:700;font-size:1.3rem;margin-bottom:14px;text-align:center;}
+  .leaderboard ol{margin-left:26px;text-align:left;}
+  .leaderboard li{padding:5px 0;font-size:1.15rem;color:var(--cream);}
+  .leaderboard li.empty{color:#94a3b8;}
 
   /* ---------- ABOUT ---------- */
   .about-card{
@@ -106,7 +122,7 @@
     background:linear-gradient(135deg,#1e3a2f,#2d5a3d);
     border:3px solid #4ade80;margin-bottom:16px;overflow:hidden;
   }
-  .photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo img{width:100%;height:100%;object-fit:contain;display:block;object-position:center center;}
   .photo img.rot90{
     position:absolute;top:50%;left:50%;
     transform:translate(-50%,-50%) rotate(90deg);
@@ -141,6 +157,69 @@
   }
   .countdown{font-size:.95rem;color:#bbf7d0;}
 
+  /* ---------- TIMER BAR: fills up, oversized beetle rides the progress edge ---------- */
+  .timer-bar{
+    position:relative;width:100%;height:34px;margin-top:14px;
+    background:rgba(0,0,0,.45);border:2px solid #4ade80;border-radius:999px;
+  }
+  .timer-fill{
+    position:absolute;inset:0;width:0%;
+    background:linear-gradient(90deg,#166534,#22c55e);
+    transition:width .95s linear;
+  }
+  .timer-beetle{
+    position:absolute;top:50%;left:0;
+    font-size:3.4rem;line-height:1;   /* deliberately bigger than the bar so it covers the frame */
+    /* origin and travel match the fill: beetle's center tracks the fill edge exactly */
+    margin-left:0;
+    transform:translate(-50%,-50%);
+    transition:left .95s linear;
+    filter:drop-shadow(0 0 6px rgba(0,0,0,.7));
+    z-index:2;
+  }
+  .timer-text{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:.9rem;font-weight:700;color:var(--cream);
+    text-shadow:1px 1px 2px rgba(0,0,0,.7);
+  }
+  .timer-bar.wait .timer-fill{background:linear-gradient(90deg,#92400e,#facc15);}
+
+  /* ---------- FALLING EMOJI BACKDROP (game screen) ---------- */
+  .falling-emoji{
+    position:absolute;top:-8vh;
+    font-size:1.5rem;
+    opacity:.55;
+    pointer-events:none;
+    animation:fall linear infinite;
+  }
+  @keyframes fall{
+    from{transform:translateY(0) rotate(0deg);}
+    to{transform:translateY(115vh) rotate(360deg);}
+  }
+
+  /* ---------- DIAGONAL BEETLE MARCH (main menu backdrop) ---------- */
+  .menu-beetle{
+    position:absolute;
+    font-size:1.7rem;
+    opacity:.55;
+    pointer-events:none;
+    animation:slideDiagonal linear infinite;
+  }
+  /* travel from far off the bottom-left to well past the top-right so the
+     screen is always covered, at every moment of the animation */
+  @keyframes slideDiagonal{
+    from{transform:translate(-45vw, 45vw) rotate(-45deg);}
+    to{transform:translate(145vw, -145vw) rotate(-45deg);}
+  }
+  .backdrop{
+    position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;
+  }
+  /* content of every screen always renders above its backdrop */
+  .screen > *:not(.backdrop){position:relative;z-index:1;}
+  /* falling emojis always stay behind every screen's content */
+  .screen{position:relative;z-index:1;}
+  #screen-game .quiz-card, #screen-game .game-hud{position:relative;z-index:1;}
+
   /* ---------- OVERLAYS (in-game menu + confirm) ---------- */
   .overlay{
     display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);
@@ -165,50 +244,72 @@
 
 <!-- ======================= 1. MAIN MENU ======================= -->
 <section id="screen-menu" class="screen active">
+  <div class="backdrop" id="menuBackdrop"></div>
   <div class="top-score-corner">🏆 Highest score: <span id="highScore">0</span></div>
   <div class="leaf">🌿🪲🌿</div>
   <h1>BEETLE OR NOT?</h1>
-  <p class="tagline">A jungle photo quiz from the rainforests of Malaysia</p>
+  <p class="tagline">Do you know your stuff?</p>
   <div class="menu-buttons">
     <button class="big-btn" id="btnNewGame">🌳 New Game</button>
+    <button class="big-btn lb" id="btnLeaderboard">🏆 Leaderboard</button>
     <button class="big-btn about" id="btnAbout">📖 About</button>
     <button class="big-btn exit" id="btnExit">🚪 Exit</button>
   </div>
   <div class="exit-note" id="exitNote"></div>
 </section>
 
-<!-- ======================= 2. GAME SCREEN ======================= -->
-<section id="screen-game" class="screen">
-  <div class="game-hud">
-    <span class="score-pill">Score: <span id="scoreVal">0</span> · Streak: <span id="streakVal">0</span></span>
-    <button class="menu-btn" id="btnInGameMenu">☰ Menu</button>
+<!-- ======================= 4. LEADERBOARD SCREEN ======================= -->
+<section id="screen-leaderboard" class="screen">
+  <div class="backdrop" id="lbBackdrop"></div>
+  <div class="leaf">🏆🌿</div>
+  <h1>Leaderboard</h1>
+  <p class="tagline">Top 10 rounds this session</p>
+  <div class="leaderboard">
+    <ol id="lbList"></ol>
   </div>
-  <div class="quiz-card">
-    <div class="question" id="questionText">Is this a beetle?</div>
-    <div class="photo" id="photoBox"></div>
-    <div class="photo-credit" id="photoCredit"></div>
-    <div class="answers" id="answerRow">
-      <button class="ans-btn ans-yes" id="ansYes">✔ Beetle!</button>
-      <button class="ans-btn ans-no" id="ansNo">✘ Not a beetle</button>
-    </div>
-    <div class="verdict" id="verdict"></div>
-    <div class="species-name" id="speciesName"></div>
-    <div class="obs-info" id="obsInfo"></div>
-    <div class="streak-note" id="streakNote"></div>
-    <div class="wait-controls" id="waitControls" style="display:none;">
-      <span class="countdown" id="countdown"></span>
-      <button id="btnSkip">Next photo ▶</button>
-    </div>
-  </div>
+  <button class="back-btn" id="btnBackMenuLb">⬅ Main Menu</button>
 </section>
+
+  <!-- ======================= 2. GAME SCREEN ======================= -->
+<section id="screen-game" class="screen">
+  <div class="backdrop" id="gameBackdrop"></div>
+  <div class="game-hud">
+      <span class="score-pill">Score: <span id="scoreVal">0</span></span>
+      <button class="menu-btn" id="btnInGameMenu">☰ Menu</button>
+    </div>
+    <div class="quiz-card">
+      <div class="question" id="questionText">Is this a beetle?</div>
+      <div class="photo" id="photoBox"></div>
+      <div class="photo-credit" id="photoCredit"></div>
+      <div class="answers" id="answerRow">
+        <button class="ans-btn ans-yes" id="ansYes">✔ Beetle!</button>
+        <button class="ans-btn ans-no" id="ansNo">✘ Not a beetle</button>
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <div class="species-name" id="speciesName"></div>
+      <div class="obs-info" id="obsInfo"></div>
+      <div class="streak-note" id="streakNote"></div>
+<div class="wait-controls" id="waitControls" style="display:none;">
+        <span class="countdown" id="countdown"></span>
+        <button id="btnSkip">🏠 Main Menu</button>
+        <button id="btnRoundNewGame">🌳 New Game</button>
+      </div>
+      <div class="timer-bar" id="timerBar">
+        <div class="timer-fill" id="timerFill"></div>
+        <div class="timer-beetle" id="timerBeetle">🪲</div>
+        <div class="timer-text" id="timerText"></div>
+      </div>
+    </div>
+  </section>
 
 <!-- ======================= 3. ABOUT SCREEN ======================= -->
 <section id="screen-about" class="screen">
+  <div class="backdrop" id="aboutBackdrop"></div>
   <div class="leaf">📖🌿</div>
   <h1>About</h1>
   <div class="about-card">
     <p>Just a goofy project by a beetle enthusiast. 🪲</p>
-    <p>All observations are chosen from the <b>genus</b>, <b>species</b>, or <b>subspecies</b> level — so every photo in the quiz comes from a properly named beetle (or impostor!) record. Look closely, trust your instincts, and remember: one wrong answer ends your streak!</p>
+    <p>All observations are chosen from the <b>genus</b>, <b>species</b>, or <b>subspecies</b> level — so every photo in the quiz comes from a properly named beetle (or impostor!) record. Look closely, trust your instincts — a wrong answer ends the round!</p>
   </div>
   <button class="back-btn" id="btnBackMenu">⬅ Main Menu</button>
 </section>
@@ -239,37 +340,38 @@
    and Heteroptera (taxon 61267) in Malaysia (place 7155), fetched at game start.
    The curated list below is the offline fallback so the game never opens empty. */
 const INAT_URL = "https://api.inaturalist.org/v1/observations?taxon_id=47208,61267&place_id=7155&photos=true&quality_grade=research&identifications=most_agree&per_page=100";
+const INAT_MAX_PAGES = 10; // up to 1000 observations per round
 
 const observations = [
-  { isBeetle: true,  emoji: "🪲", name: "Chalcosoma atlas (Atlas beetle)",
+  { isBeetle: true, isAssassinBug: false, emoji: "🪲", name: "Chalcosoma atlas (Atlas beetle)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/760072452/medium.jpg",
     credit: "Photo: zfengze, CC BY-NC, via iNaturalist",
     info: "One of Southeast Asia's largest rhinoceros beetles. Males grow a huge pair of curved horns used to wrestle rivals on tree trunks." },
-  { isBeetle: true,  emoji: "🪲", name: "Cheirotonus peracanus",
+  { isBeetle: true, isAssassinBug: false, emoji: "🪲", name: "Cheirotonus peracanus",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/751273422/medium.jpg",
     credit: "Photo: zhangtianyuan, CC BY-NC, via iNaturalist",
     info: "A large, colourful scarab beetle with metallic green-and-orange patterning, found in Malaysian montane forests." },
-  { isBeetle: true,  emoji: "✨", name: "Prosopocoilus zebra (stag beetle)",
+  { isBeetle: true, isAssassinBug: false, emoji: "✨", name: "Prosopocoilus zebra (stag beetle)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/759725427/medium.jpg",
     credit: "Photo: Rob Foster, CC BY, via iNaturalist",
     info: "A striking stag beetle whose oversized, antler-like jaws are used by males to fight over sap sites." },
-  { isBeetle: true,  emoji: "🐞", name: "Coccinella transversalis (ladybird beetle)",
+  { isBeetle: true, isAssassinBug: false, emoji: "🐞", name: "Coccinella transversalis (ladybird beetle)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/764929900/medium.jpg",
     credit: "Photo: Amir2010, CC BY-NC, via iNaturalist",
     info: "A transverse-banded ladybird that preys on aphids. It IS a beetle — ladybirds are beetles in the family Coccinellidae." },
-  { isBeetle: false, emoji: "🕷️", name: "Macracantha hasselti (spiny orb-weaver)",
+  { isBeetle: false, isAssassinBug: false, emoji: "🕷️", name: "Macracantha hasselti (spiny orb-weaver)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/684802791/medium.jpg",
     credit: "Photo: Izz, CC BY-NC, via iNaturalist",
     info: "A spider, not a beetle! Its hard orange shell and crab-like shape fool many people, but spiders have eight legs; beetles have six." },
-  { isBeetle: false, emoji: "🦗", name: "Phyllomimus unicolor (leaf cricket)",
+  { isBeetle: false, isAssassinBug: false, emoji: "🦗", name: "Phyllomimus unicolor (leaf cricket)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/753628732/medium.jpg",
     credit: "Photo: Valentina L., CC BY-NC, via iNaturalist",
     info: "A leaf-mimicking katydid. Its wing covers look like beetle shells, but the long hind legs give it away as a cricket." },
-  { isBeetle: false, emoji: "🐛", name: "Catacanthus incarnatus (man-faced bug)",
+  { isBeetle: false, isAssassinBug: false, emoji: "🐛", name: "Catacanthus incarnatus (man-faced bug)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/729791676/medium.jpg",
     credit: "Photo: wongfookyee, CC BY-NC, via iNaturalist",
     info: "A true bug (Heteroptera) famous for the face-like markings on its back. True bugs have piercing sucking mouthparts; beetles chew." },
-  { isBeetle: false, emoji: "💎", name: "Chrysocoris stollii (jewel bug)",
+  { isBeetle: false, isAssassinBug: false, emoji: "💎", name: "Chrysocoris stollii (jewel bug)",
     src: "https://inaturalist-open-data.s3.amazonaws.com/photos/698255279/medium.jpg",
     credit: "Photo: Will II Bell, CC BY-NC, via iNaturalist",
     info: "A metallic jewel bug (scutellerid). Its shiny enlarged scutellum resembles beetle wing covers, but it is a true bug." },
@@ -280,11 +382,14 @@ function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   const target = document.getElementById(id);
   target.classList.add("active");
-  target.scrollIntoView({ behavior: "smooth" });
+  // falling emojis only on the game and leaderboard screens
+  setFallingEmojis(id === "screen-game" || id === "screen-leaderboard");
+  // the diagonal beetle march belongs to the main menu and About screens
+  setMenuBeetles(id === "screen-menu" || id === "screen-about");
 }
 
 /* ================= GAME STATE ================= */
-let score = 0, streak = 0, highScore = 0;
+let score = 0, highScore = 0;
 let current = null, answered = false;
 let timer = null, secondsLeft = 0;
 let deck = [];
@@ -299,10 +404,34 @@ function shuffle(arr) {
   return arr;
 }
 
-/* Draw the next photo from a shuffled deck: nothing answered correctly repeats. */
+/* Draw the next photo. Group probability is normalized so that:
+   - a beetle (Coleoptera) is exactly as likely as a true bug (Heteroptera), and
+   - assassin bugs (Reduviidae) are 50% less likely than other bugs.
+   Draws only from the deck; `retirePhoto` removes entries so an observation
+   answered correctly never appears again this round. */
 function drawPhoto() {
   if (deck.length === 0) deck = shuffle(observations.slice());
-  return deck.pop();
+  const beetles = deck.filter(o => o.isBeetle);
+  const bugs = deck.filter(o => !o.isBeetle && !o.isAssassinBug);
+  const assassinBugs = deck.filter(o => o.isAssassinBug);
+  // coin flip between the two orders; assassin bugs weigh half within the bug side
+  const bugWeight = bugs.length + assassinBugs.length * 0.5;
+  const pickBug = Math.random() < 0.5;
+  let pool;
+  if (pickBug || beetles.length === 0) {
+    if (Math.random() * bugWeight < bugs.length || assassinBugs.length === 0) {
+      pool = bugs;
+    } else {
+      pool = assassinBugs;
+    }
+  } else {
+    pool = beetles;
+  }
+  if (!pool || pool.length === 0) pool = deck;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  // remove it from the deck entirely: never shown again this round
+  deck = deck.filter(o => o.src !== pick.src);
+  return pick;
 }
 
 /* Remove an answered-correct observation from the deck so it can't repeat this round. */
@@ -315,12 +444,16 @@ function orientPhoto(obs, img) {
   const probe = new Image();
   probe.onload = () => {
     if (probe.naturalHeight > probe.naturalWidth) {
-      // Swap width/height, then scale so the rotated photo covers the frame.
+      // Portrait photo: rotate 90°, then fit the whole (rotated) image inside the
+      // frame — "contain", not "cover" — so the subject is never zoomed out of view.
       const frame = img.parentElement.getBoundingClientRect();
-      const w = Math.max(frame.width, frame.height);
-      const h = Math.min(frame.width, frame.height);
-      img.style.width = w + "px";
-      img.style.height = h + "px";
+      const frameW = frame.width, frameH = frame.height;
+      // after rotation, the photo's width on screen = its natural height, and vice versa
+      const rotW = probe.naturalHeight, rotH = probe.naturalWidth;
+      const scale = Math.min(frameW / rotW, frameH / rotH);
+      img.style.width = (rotW * scale) + "px";
+      img.style.height = (rotH * scale) + "px";
+      img.style.objectFit = "contain";
       img.classList.add("rot90");
     }
   };
@@ -328,9 +461,9 @@ function orientPhoto(obs, img) {
 }
 
 /* Build a live deck from iNaturalist: research-grade Coleoptera + Heteroptera in Malaysia.
-   Paginates through as many pages as the API allows (100/page, hard cap 10k results,
-   30 requests/minute). Falls back silently to the curated list on any failure. */
-const INAT_MAX_PAGES = 10; // up to 1000 observations per round
+   To avoid repeating the same observations every attempt, each round fetches a random
+   page window out of the API's full result set (10 pages sampled from up to ~100 pages
+   available, so rounds rarely share photos). Falls back silently on any failure. */
 
 async function fetchObservationPage(page) {
   const url = INAT_URL + "&order_by=created_at&order_direction=desc&page=" + page;
@@ -344,9 +477,12 @@ async function fetchObservationPage(page) {
     if (!t || !t.name || !p || !p.url) continue;
     const anc = (t.ancestry || "").split("/");
     const isBeetle = anc.includes("47208") && !anc.includes("61267");
+    // assassin bugs (family Reduviidae, taxon 48959) get weighted down at draw time
+    const isAssassinBug = anc.includes("48959");
     const cc = p.license_code && p.license_code.toLowerCase() !== "none";
     out.push({
       isBeetle,
+      isAssassinBug,
       emoji: isBeetle ? "🪲" : "🐛",
       name: t.name + (t.rank !== "species" ? " (" + t.rank + ")" : ""),
       src: p.url.replace(/\/square\.jpe?g$/, "/medium.jpg"),
@@ -363,22 +499,35 @@ async function fetchObservationPage(page) {
 
 async function loadLiveObservations() {
   try {
-    const live = [];
-    for (let page = 1; page <= INAT_MAX_PAGES; page++) {
-      const batch = await fetchObservationPage(page);
-      live.push(...batch);
-      if (batch.length < 100) break; // ran out of observations
+    // remember how many results the last fetch saw, so later rounds can jump deeper
+    let totalPages = 10;
+    if (loadLiveObservations.lastTotal) {
+      totalPages = Math.max(1, Math.min(100, Math.ceil(loadLiveObservations.lastTotal / 100)));
     }
+    const startPage = 1 + Math.floor(Math.random() * totalPages);
+    // fetch all pages in parallel (iNaturalist allows ~60 req/min) — cuts load time
+    // from ~10s sequential to roughly the duration of a single request
+    const pages = [];
+    for (let p = 0; p < INAT_MAX_PAGES; p++) {
+      pages.push(((startPage - 1 + p) % totalPages) + 1);
+    }
+    const batches = await Promise.all(pages.map(pg => fetchObservationPage(pg)));
+    const live = batches.flat();
     if (live.length > 0) {
+      // dedupe by photo url (page windows can overlap on a rolling dataset)
+      const seen = new Set();
+      const unique = live.filter(o => !seen.has(o.src) && (seen.add(o.src), true));
       observations.length = 0;
-      observations.push(...live);
+      observations.push(...unique);
+      // remember the total so the next attempt can start from a different window
+      loadLiveObservations.lastTotal = Math.max(unique.length, loadLiveObservations.lastTotal || 0);
+      loadLiveObservations.attempt = (loadLiveObservations.attempt || 0) + 1;
     }
   } catch (e) { /* offline or blocked: curated fallback stays */ }
 }
 
 function updateHud() {
   el("scoreVal").textContent = score;
-  el("streakVal").textContent = streak;
   el("highScore").textContent = highScore;
 }
 
@@ -410,42 +559,98 @@ function nextPhoto() {
   el("verdict").className = "verdict";
   el("speciesName").textContent = "";
   el("obsInfo").textContent = "";
+  el("obsInfo").style.display = "none";
   el("streakNote").textContent = "";
   el("waitControls").style.display = "none";
+  el("countdown").textContent = "";
   el("answerRow").style.display = "flex";
   el("questionText").textContent = "Is this a beetle?";
+  showTimerBar();
   startPhotoTimer();
 }
 
-/* 10 seconds per photo. If time runs out, the round wraps up immediately. */
+/* 10 seconds per photo: a bar fills up while a beetle crawls across.
+   If time runs out, the round wraps up immediately. */
 function startPhotoTimer() {
   secondsLeft = 10;
-  el("countdown").textContent = "⏱ " + secondsLeft + "s";
-  el("waitControls").style.display = "flex";
-  el("btnSkip").style.visibility = "hidden";
+  setTimerBar(0, "⏱ " + secondsLeft + "s", true); // instant reset each photo
   timer = setInterval(() => {
     secondsLeft--;
+    const elapsed = 10 - secondsLeft;
     if (secondsLeft <= 0) {
       clearInterval(timer);
+      setTimerBar(100, "⏱ 0s");
       timeUp();
     } else {
-      el("countdown").textContent = "⏱ " + secondsLeft + "s";
+      setTimerBar(elapsed * 10, "⏱ " + secondsLeft + "s");
     }
   }, 1000);
 }
 
+function setTimerBar(pct, text, instant) {
+  // instant=true resets the bar on the same frame (no transition animation)
+  const fill = el("timerFill");
+  const beetle = el("timerBeetle");
+  if (instant) {
+    fill.style.transition = "none";
+    beetle.style.transition = "none";
+    void fill.offsetWidth; // force reflow so the jump below can't animate
+  }
+  fill.style.width = pct + "%";
+  // the beetle's center sits exactly on the fill edge: same origin, same speed
+  beetle.style.left = pct + "%";
+  el("timerText").textContent = text;
+  if (instant) {
+    // restore the transition right after the jump
+    requestAnimationFrame(() => {
+      fill.style.transition = "";
+      beetle.style.transition = "";
+    });
+  }
+}
+
+function hideTimerBar() {
+  el("timerBar").style.display = "none";
+}
+function showTimerBar() {
+  el("timerBar").style.display = "block";
+}
+
 function timeUp() {
   answered = true;
+  hideTimerBar();
   highScore = Math.max(highScore, score);
+  recordAttempt(score);
   updateHud();
   el("answerRow").style.display = "none";
   el("verdict").textContent = "⏰ Time's up!";
   el("verdict").className = "verdict wrong";
   el("speciesName").textContent = current.name;
   el("obsInfo").textContent = current.info || "";
+  el("obsInfo").style.display = current.info ? "block" : "none";
   el("streakNote").textContent = "The round ends here — final score: " + score +
     " (best this session: " + highScore + ")";
   el("waitControls").style.display = "none";
+  // after the 10s read-up timer, go straight to the main menu
+  startAutoReturn();
+}
+
+/* 10s to read the result, then the main menu is shown automatically.
+   The player can jump there sooner with the buttons below. */
+function startAutoReturn() {
+  secondsLeft = 10;
+  el("waitControls").style.display = "flex";
+  el("btnSkip").textContent = "🏠 Main Menu";
+  el("countdown").textContent = "Back to menu in " + secondsLeft + "s";
+  timer = setInterval(() => {
+    secondsLeft--;
+    if (secondsLeft <= 0) {
+      clearInterval(timer);
+      endRound();
+    } else {
+      el("countdown").textContent = "Back to menu in " + secondsLeft + "s";
+    }
+  }, 1000);
 }
 
 function answer(isYes) {
@@ -454,47 +659,57 @@ function answer(isYes) {
   clearInterval(timer);
   const correct = (isYes === current.isBeetle);
   if (correct) {
-    score += 10; streak += 1;
+    score += 1;
     highScore = Math.max(highScore, score);
     retirePhoto(current); // answered correctly: never repeats this round
+    setTimerBar(0, "", true); // snap the bar to zero right away
     el("verdict").textContent = "✅ Correct! It IS " + (current.isBeetle ? "a beetle!" : "not a beetle!");
     el("verdict").className = "verdict right";
-    el("streakNote").textContent = "Streak: " + streak + " — keep going! 🌿";
     setTimeout(nextPhoto, 1500);
   } else {
-    streak = 0; // reset the streak
     el("verdict").textContent = "❌ Wrong!";
     el("verdict").className = "verdict wrong";
-    el("streakNote").textContent = "Your streak resets to 0. One more look…";
-    startWaitCountdown();
+    // the round is over: record it and offer menu options
+    highScore = Math.max(highScore, score);
+    recordAttempt(score);
+    updateHud();
+    startAutoReturn();
   }
   updateHud();
   el("answerRow").style.display = "none";
   // species name and info are shown whether the answer was right or wrong
   el("speciesName").textContent = current.name;
   el("obsInfo").textContent = current.info || "";
+  el("obsInfo").style.display = current.info ? "block" : "none";
 }
 
 function startWaitCountdown() {
-  clearInterval(timer); // replace any running photo timer
+  clearInterval(timer); // replace any running timer
   secondsLeft = 10;
+  // reuse the same bar, amber mode, beetle walks back as the wait drains
+  el("timerBar").classList.add("wait");
+  el("timerBar").style.display = "block";
   el("waitControls").style.display = "flex";
-  el("btnSkip").style.visibility = "visible";
-  el("countdown").textContent = "Next photo in " + secondsLeft + "s";
+  setTimerBar(100, "Next photo in 10s", true); // instant jump to full
   timer = setInterval(() => {
     secondsLeft--;
-    if (secondsLeft <= 0) nextPhoto();
-    else el("countdown").textContent = "Next photo in " + secondsLeft + "s";
+    if (secondsLeft <= 0) {
+      el("timerBar").classList.remove("wait");
+      nextPhoto();
+    } else {
+      setTimerBar(secondsLeft * 10, "Next photo in " + secondsLeft + "s");
+    }
   }, 1000);
 }
 
 el("ansYes").onclick = () => answer(true);
 el("ansNo").onclick = () => answer(false);
-el("btnSkip").onclick = () => { if (answered) nextPhoto(); };
+el("btnSkip").onclick = () => { clearInterval(timer); endRound(); }; // Main Menu after a round ends
+el("btnRoundNewGame").onclick = () => { clearInterval(timer); el("waitControls").style.display = "none"; startNewGame(); };
 
 /* ================= MENU FLOW ================= */
-el("btnNewGame").onclick = async () => {
-  score = 0; streak = 0; deck = [];
+async function startNewGame() {
+  score = 0; deck = [];
   updateHud();
   showScreen("screen-game");
   el("questionText").textContent = "Fetching observations from iNaturalist…";
@@ -502,9 +717,40 @@ el("btnNewGame").onclick = async () => {
   el("photoCredit").textContent = "";
   await loadLiveObservations();
   nextPhoto();
-};
+}
+el("btnNewGame").onclick = startNewGame;
 el("btnAbout").onclick = () => showScreen("screen-about");
 el("btnBackMenu").onclick = () => showScreen("screen-menu");
+
+/* ================= SESSION LEADERBOARD ================= */
+const attemptScores = []; // every finished round's score, this session only
+
+function recordAttempt(scoreVal) {
+  attemptScores.push(scoreVal);
+  attemptScores.sort((a, b) => b - a);
+  if (attemptScores.length > 10) attemptScores.length = 10;
+}
+
+function renderLeaderboard() {
+  const list = el("lbList");
+  list.innerHTML = "";
+  for (let i = 0; i < 10; i++) {
+    const li = document.createElement("li");
+    if (i < attemptScores.length) {
+      li.textContent = attemptScores[i] + " points";
+    } else {
+      li.textContent = "-";
+      li.className = "empty";
+    }
+    list.appendChild(li);
+  }
+}
+
+el("btnLeaderboard").onclick = () => {
+  renderLeaderboard();
+  showScreen("screen-leaderboard");
+};
+el("btnBackMenuLb").onclick = () => showScreen("screen-menu");
 
 /* ================= EXIT ================= */
 let exitNoteTimer = null;
@@ -534,7 +780,7 @@ function closeOverlay(id) { el(id).classList.remove("show"); }
 el("btnInGameMenu").onclick = () => { clearInterval(timer); openOverlay("overlayMenu"); };
 el("btnContinue").onclick = () => {
   closeOverlay("overlayMenu");
-  if (answered && el("waitControls").style.display !== "none" && secondsLeft > 0) {
+  if (answered && el("timerBar").style.display !== "none" && secondsLeft > 0) {
     startWaitCountdown(); // resuming a wrong-answer wait
   } else if (!answered) {
     startPhotoTimer(); // resuming the question timer
@@ -542,7 +788,7 @@ el("btnContinue").onclick = () => {
 };
 el("btnToMainMenu").onclick = () => {
   closeOverlay("overlayMenu");
-  el("confirmScore").textContent = "Your score this round: " + score + " (streak " + streak + ")";
+  el("confirmScore").textContent = "Your score this round: " + score;
   openOverlay("overlayConfirm");
 };
 el("btnReturnGame").onclick = () => {
@@ -555,7 +801,79 @@ el("btnConfirmQuit").onclick = () => {
   endRound();
 };
 
+/* ================= FALLING EMOJI BACKDROP ================= */
+const FALL_EMOJIS = ["🪲","🐞","🐜","🦗","🕷️","🐛","🦋","🐝","🦂","🐌","🪳","🕸️","🌿","🍃","🌱","🌴","🍀"];
+const FALL_TARGET = 35; // keep 30–40 emojis falling at any moment
+
+function spawnFallingEmoji() {
+  // alternate between the game and leaderboard backdrops
+  const hosts = [el("gameBackdrop"), el("lbBackdrop")];
+  const host = hosts[Math.floor(Math.random() * hosts.length)];
+  const e = document.createElement("span");
+  e.className = "falling-emoji";
+  e.textContent = FALL_EMOJIS[Math.floor(Math.random() * FALL_EMOJIS.length)];
+  e.style.left = Math.random() * 96 + "%";
+  const size = 1.35 + Math.random() * 1.35; // ~1.35–2.7rem (150% of the original 0.9–1.8rem)
+  e.style.fontSize = size + "rem";
+  const dur = 6 + Math.random() * 7;      // 6–13s descent
+  e.style.animationDuration = dur + "s";
+  e.style.animationDelay = -Math.random() * dur + "s"; // start mid-flight
+  e.addEventListener("animationiteration", () => {
+    // new lane + emoji each time it loops back to the top
+    e.style.left = Math.random() * 96 + "%";
+    e.textContent = FALL_EMOJIS[Math.floor(Math.random() * FALL_EMOJIS.length)];
+  });
+  host.appendChild(e);
+  return e;
+}
+/* Show or hide the falling-emoji backdrop depending on the screen. */
+function setFallingEmojis(on) {
+  document.querySelectorAll(".backdrop").forEach(b => {
+    if (b.id !== "menuBackdrop") b.style.display = on ? "block" : "none";
+  });
+}
+/* Rows of beetles sliding diagonally on the main menu.
+   Rows start off-screen at the bottom-left and exit off-screen top-right. */
+function spawnMenuBeetles(hostId) {
+  const host = el(hostId);
+  const rows = 12;
+  const perRow = 8;
+  for (let row = 0; row < rows; row++) {
+    // same lane structure as before (11vh steps), shifted left so the whole
+    // diagonal band covers the screen including the top-left corner
+    const laneOffset = row * 11;
+    const dur = (row % 2 === 1) ? 18 : 9;   // every other row: 50% slower
+    for (let i = 0; i < perRow; i++) {
+      const e = document.createElement("span");
+      e.className = "menu-beetle";
+      e.textContent = "🪲";
+      e.style.bottom = (18 - laneOffset * 1.4) + "vh";
+      e.style.left = (12 + laneOffset * 1.4 - 40) + "vw"; // shifted 40vw left
+      e.style.animationDuration = dur + "s";
+      // negative delay = pre-spawned already mid-flight; no static beetles on entry
+      e.style.animationDelay = -((i * dur / perRow + row * 0.9) % dur) + "s";
+      host.appendChild(e);
+    }
+  }
+}
+/* Rows of beetles sliding diagonally — used by the main menu and About screens.
+   Rows start off-screen at the bottom-left and exit off-screen top-right. */
+function setMenuBeetles(on) {
+  ["menuBackdrop", "aboutBackdrop"].forEach(id => {
+    el(id).style.display = on ? "block" : "none";
+  });
+}
+
+function startFallingEmojis() {
+  for (let i = 0; i < FALL_TARGET; i++) spawnFallingEmoji();
+}
+
 updateHud();
+spawnMenuBeetles("menuBackdrop");
+spawnMenuBeetles("aboutBackdrop");
+setMenuBeetles(true);
+startFallingEmojis();
+setFallingEmojis(false); // the game starts on the main menu: no falling emojis there
 </script>
 </body>
 </html>

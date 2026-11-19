@@ -720,12 +720,27 @@ el("btnRoundNewGame").onclick = () => { clearInterval(timer); el("waitControls")
 
 /* ================= MENU FLOW ================= */
 async function startNewGame() {
+  // fully reset round state: cancel any pending auto-return/losing screen,
+  // clear the answered flag so stale clicks can't leak into the new round
+  clearInterval(timer);
+  timer = null;
+  timerMode = null;
+  timerRemainMs = 0;
+  cancelAnimationFrame(timer);
+  answered = false;
   score = 0; deck = [];
   updateHud();
   showScreen("screen-game");
   el("questionText").textContent = "Fetching observations from iNaturalist…";
   el("photoBox").innerHTML = '<div class="fallback">🛰️</div>';
   el("photoCredit").textContent = "";
+  el("verdict").textContent = "";
+  el("speciesName").textContent = "";
+  el("obsInfo").textContent = "";
+  el("obsInfo").style.display = "none";
+  el("streakNote").textContent = "";
+  el("waitControls").style.display = "none";
+  el("timerBar").classList.remove("wait");
   await loadLiveObservations();
   nextPhoto();
 }
@@ -781,6 +796,10 @@ el("btnExit").onclick = () => {
 /* ================= IN-GAME MENU ================= */
 function endRound() {
   clearInterval(timer);
+  timer = null;
+  timerMode = null;
+  cancelAnimationFrame(timer);
+  answered = false;
   highScore = Math.max(highScore, score);
   updateHud();
   showScreen("screen-menu");

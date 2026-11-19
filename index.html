@@ -107,6 +107,11 @@
     border:3px solid #4ade80;margin-bottom:16px;overflow:hidden;
   }
   .photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo img.rot90{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%) rotate(90deg);
+    object-fit:cover;
+  }
   .photo .fallback{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-size:5rem;
@@ -305,33 +310,64 @@ function retirePhoto(obs) {
   deck = deck.filter(o => o.src !== obs.src);
 }
 
+/* Rotate portrait photos 90° so they fill the landscape frame. */
+function orientPhoto(obs, img) {
+  const probe = new Image();
+  probe.onload = () => {
+    if (probe.naturalHeight > probe.naturalWidth) {
+      // Swap width/height, then scale so the rotated photo covers the frame.
+      const frame = img.parentElement.getBoundingClientRect();
+      const w = Math.max(frame.width, frame.height);
+      const h = Math.min(frame.width, frame.height);
+      img.style.width = w + "px";
+      img.style.height = h + "px";
+      img.classList.add("rot90");
+    }
+  };
+  probe.src = obs.src;
+}
+
 /* Build a live deck from iNaturalist: research-grade Coleoptera + Heteroptera in Malaysia.
-   Falls back silently to the curated list on any failure. */
+   Paginates through as many pages as the API allows (100/page, hard cap 10k results,
+   30 requests/minute). Falls back silently to the curated list on any failure. */
+const INAT_MAX_PAGES = 10; // up to 1000 observations per round
+
+async function fetchObservationPage(page) {
+  const url = INAT_URL + "&order_by=created_at&order_direction=desc&page=" + page;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const out = [];
+  for (const r of (data.results || [])) {
+    const t = r.taxon;
+    const p = (r.photos || [])[0];
+    if (!t || !t.name || !p || !p.url) continue;
+    const anc = (t.ancestry || "").split("/");
+    const isBeetle = anc.includes("47208") && !anc.includes("61267");
+    const cc = p.license_code && p.license_code.toLowerCase() !== "none";
+    out.push({
+      isBeetle,
+      emoji: isBeetle ? "🪲" : "🐛",
+      name: t.name + (t.rank !== "species" ? " (" + t.rank + ")" : ""),
+      src: p.url.replace(/\/square\.jpe?g$/, "/medium.jpg"),
+      credit: p.attribution || "via iNaturalist",
+      info: "Research-grade iNaturalist observation from Malaysia, identified as " +
+            t.name + " (" + t.rank + " rank, " +
+            (isBeetle ? "order Coleoptera — a beetle" : "suborder Heteroptera — a true bug") + "). " +
+            (r.place_guess ? "Location: " + r.place_guess + ". " : "") +
+            (cc ? "Photo licensed " + p.license_code.toUpperCase() + "." : "Photo all rights reserved."),
+    });
+  }
+  return out;
+}
+
 async function loadLiveObservations() {
   try {
-    const res = await fetch(INAT_URL);
-    if (!res.ok) return;
-    const data = await res.json();
     const live = [];
-    for (const r of (data.results || [])) {
-      const t = r.taxon;
-      const p = (r.photos || [])[0];
-      if (!t || !t.name || !p || !p.url) continue;
-      const anc = (t.ancestry || "").split("/");
-      const isBeetle = anc.includes("47208") && !anc.includes("61267");
-      const cc = p.license_code && p.license_code.toLowerCase() !== "none";
-      live.push({
-        isBeetle,
-        emoji: isBeetle ? "🪲" : "🐛",
-        name: t.name + (t.rank !== "species" ? " (" + t.rank + ")" : ""),
-        src: p.url.replace(/\/square\.jpe?g$/, "/medium.jpg"),
-        credit: p.attribution || "via iNaturalist",
-        info: "Research-grade iNaturalist observation from Malaysia, identified as " +
-              t.name + " (" + t.rank + " rank, " +
-              (isBeetle ? "order Coleoptera — a beetle" : "suborder Heteroptera — a true bug") + "). " +
-              (r.place_guess ? "Location: " + r.place_guess + ". " : "") +
-              (cc ? "Photo licensed " + p.license_code.toUpperCase() + "." : "Photo all rights reserved."),
-      });
+    for (let page = 1; page <= INAT_MAX_PAGES; page++) {
+      const batch = await fetchObservationPage(page);
+      live.push(...batch);
+      if (batch.length < 100) break; // ran out of observations
     }
     if (live.length > 0) {
       observations.length = 0;
@@ -356,6 +392,7 @@ function setPhoto(obs) {
     img.onerror = () => {
       box.innerHTML = '<div class="fallback">' + obs.emoji + "</div>";
     };
+    orientPhoto(obs, img);
     box.appendChild(img);
     el("photoCredit").textContent = obs.credit;
   } else {
@@ -377,6 +414,38 @@ function nextPhoto() {
   el("waitControls").style.display = "none";
   el("answerRow").style.display = "flex";
   el("questionText").textContent = "Is this a beetle?";
+  startPhotoTimer();
+}
+
+/* 10 seconds per photo. If time runs out, the round wraps up immediately. */
+function startPhotoTimer() {
+  secondsLeft = 10;
+  el("countdown").textContent = "⏱ " + secondsLeft + "s";
+  el("waitControls").style.display = "flex";
+  el("btnSkip").style.visibility = "hidden";
+  timer = setInterval(() => {
+    secondsLeft--;
+    if (secondsLeft <= 0) {
+      clearInterval(timer);
+      timeUp();
+    } else {
+      el("countdown").textContent = "⏱ " + secondsLeft + "s";
+    }
+  }, 1000);
+}
+
+function timeUp() {
+  answered = true;
+  highScore = Math.max(highScore, score);
+  updateHud();
+  el("answerRow").style.display = "none";
+  el("verdict").textContent = "⏰ Time's up!";
+  el("verdict").className = "verdict wrong";
+  el("speciesName").textContent = current.name;
+  el("obsInfo").textContent = current.info || "";
+  el("streakNote").textContent = "The round ends here — final score: " + score +
+    " (best this session: " + highScore + ")";
+  el("waitControls").style.display = "none";
 }
 
 function answer(isYes) {
@@ -407,8 +476,10 @@ function answer(isYes) {
 }
 
 function startWaitCountdown() {
+  clearInterval(timer); // replace any running photo timer
   secondsLeft = 10;
   el("waitControls").style.display = "flex";
+  el("btnSkip").style.visibility = "visible";
   el("countdown").textContent = "Next photo in " + secondsLeft + "s";
   timer = setInterval(() => {
     secondsLeft--;
@@ -463,7 +534,11 @@ function closeOverlay(id) { el(id).classList.remove("show"); }
 el("btnInGameMenu").onclick = () => { clearInterval(timer); openOverlay("overlayMenu"); };
 el("btnContinue").onclick = () => {
   closeOverlay("overlayMenu");
-  if (answered && el("waitControls").style.display !== "none" && secondsLeft > 0) startWaitCountdown();
+  if (answered && el("waitControls").style.display !== "none" && secondsLeft > 0) {
+    startWaitCountdown(); // resuming a wrong-answer wait
+  } else if (!answered) {
+    startPhotoTimer(); // resuming the question timer
+  }
 };
 el("btnToMainMenu").onclick = () => {
   closeOverlay("overlayMenu");

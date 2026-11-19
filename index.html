@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beetle or Not — Jungle Quiz</title>
+<style>
+  :root{
+    --jungle-deep:#0b3d1e;
+    --jungle-mid:#14532d;
+    --jungle-light:#22c55e;
+    --accent:#facc15;
+    --accent-hot:#f97316;
+    --danger:#ef4444;
+    --cream:#fefce8;
+    --sky:#06b6d4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI',Verdana,Arial,sans-serif;
+    background:var(--jungle-deep);
+    color:var(--cream);
+    min-height:100vh;
+  }
+  /* ---------- SCREEN (full-width stacked region) ---------- */
+  .screen{
+    position:relative;
+    min-height:100vh;
+    padding:32px 20px 48px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    transition:background .4s;
+  }
+  .screen.active{outline:none;}
+  #screen-menu{background:radial-gradient(circle at 20% 15%, #1a7a3c 0%, var(--jungle-deep) 60%);}
+  #screen-game{background:radial-gradient(circle at 80% 10%, #166534 0%, #052e16 70%);}
+  #screen-about{background:radial-gradient(circle at 30% 80%, #155e75 0%, #0b3d1e 65%);}
+
+  .leaf{font-size:1.6rem;margin-bottom:8px;}
+  h1{
+    font-size:clamp(2.2rem,6vw,3.6rem);
+    color:var(--accent);
+    text-shadow:3px 3px 0 rgba(0,0,0,.35);
+    letter-spacing:1px;
+    text-align:center;
+  }
+  .tagline{margin-top:6px;font-size:1.1rem;color:#bbf7d0;text-align:center;}
+
+  /* ---------- MAIN MENU ---------- */
+  .top-score-corner{
+    position:absolute;top:14px;right:18px;
+    font-size:.95rem;color:var(--accent);
+    background:rgba(0,0,0,.35);padding:8px 14px;border-radius:999px;
+  }
+  .menu-buttons{margin-top:48px;display:flex;flex-direction:column;gap:18px;width:min(320px,90vw);}
+  .big-btn{
+    font-size:1.4rem;font-weight:700;padding:18px;border:none;border-radius:16px;
+    cursor:pointer;color:var(--jungle-deep);background:var(--jungle-light);
+    box-shadow:0 6px 0 #166534;
+    transition:transform .1s;
+  }
+  .big-btn:hover{transform:translateY(-2px);}
+  .big-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #166534;}
+  .big-btn.about{background:var(--accent);box-shadow:0 6px 0 #a16207;}
+  .big-btn.about:active{box-shadow:0 2px 0 #a16207;}
+  .big-btn.exit{background:var(--danger);color:#fff;box-shadow:0 6px 0 #7f1d1d;}
+  .big-btn.exit:active{box-shadow:0 2px 0 #7f1d1d;}
+  .exit-note{
+    margin-top:16px;font-size:.95rem;color:#fca5a5;min-height:1.4em;
+    max-width:min(420px,90vw);text-align:center;
+  }
+
+  /* ---------- ABOUT ---------- */
+  .about-card{
+    margin-top:40px;background:rgba(0,0,0,.35);border:2px solid var(--jungle-light);
+    border-radius:18px;padding:28px;max-width:520px;font-size:1.15rem;line-height:1.7;
+  }
+  .about-card p+p{margin-top:16px;}
+  .back-btn{
+    margin-top:28px;font-size:1.1rem;padding:12px 28px;border:none;border-radius:12px;
+    cursor:pointer;background:var(--sky);color:#04283a;font-weight:700;box-shadow:0 5px 0 #0e7490;
+  }
+
+  /* ---------- GAME ---------- */
+  .game-hud{
+    position:absolute;top:14px;right:18px;display:flex;gap:10px;align-items:center;
+  }
+  .score-pill{
+    font-size:1rem;color:var(--accent);background:rgba(0,0,0,.35);
+    padding:8px 14px;border-radius:999px;font-weight:700;
+  }
+  .menu-btn{
+    font-size:.85rem;padding:8px 14px;border:none;border-radius:999px;cursor:pointer;
+    background:rgba(0,0,0,.35);color:var(--cream);border:1px solid #4ade80;
+  }
+  .quiz-card{
+    margin-top:44px;width:min(460px,94vw);background:rgba(0,0,0,.4);
+    border-radius:20px;padding:20px;border:2px solid var(--jungle-light);text-align:center;
+  }
+  .question{
+    font-size:1.4rem;font-weight:700;margin-bottom:16px;color:var(--accent);
+  }
+  .photo{
+    width:100%;height:260px;border-radius:14px;position:relative;
+    background:linear-gradient(135deg,#1e3a2f,#2d5a3d);
+    border:3px solid #4ade80;margin-bottom:16px;overflow:hidden;
+  }
+  .photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo .fallback{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:5rem;
+  }
+  .photo-credit{
+    font-size:.72rem;color:#a7f3d0;margin:-10px 0 12px;text-align:left;
+  }
+  .answers{display:flex;gap:14px;justify-content:center;}
+  .ans-btn{
+    flex:1;font-size:1.25rem;font-weight:700;padding:14px;border:none;border-radius:14px;cursor:pointer;
+  }
+  .ans-yes{background:var(--jungle-light);color:#052e16;}
+  .ans-no{background:var(--danger);color:#fff;}
+  .verdict{margin-top:16px;font-size:1.25rem;font-weight:700;min-height:1.6em;}
+  .verdict.right{color:#4ade80;}
+  .verdict.wrong{color:var(--danger);}
+  .species-name{margin-top:6px;font-size:1.1rem;color:var(--sky);font-style:italic;}
+  .obs-info{
+    margin-top:8px;font-size:.92rem;line-height:1.5;color:#d9f99d;
+    background:rgba(0,0,0,.3);border-radius:10px;padding:10px 12px;
+  }
+  .streak-note{margin-top:4px;font-size:.95rem;color:#fca5a5;}
+  .wait-controls{margin-top:14px;display:flex;gap:12px;justify-content:center;align-items:center;}
+  .wait-controls button{
+    padding:10px 22px;font-size:1rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;
+    background:var(--accent);color:#422006;
+  }
+  .countdown{font-size:.95rem;color:#bbf7d0;}
+
+  /* ---------- OVERLAYS (in-game menu + confirm) ---------- */
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);
+    z-index:50;align-items:center;justify-content:center;
+  }
+  .overlay.show{display:flex;}
+  .panel{
+    background:var(--jungle-mid);border:3px solid var(--accent);border-radius:18px;
+    padding:28px;width:min(340px,90vw);text-align:center;
+  }
+  .panel h2{color:var(--accent);margin-bottom:18px;font-size:1.5rem;}
+  .panel button{
+    display:block;width:100%;margin-top:12px;padding:14px;font-size:1.15rem;font-weight:700;
+    border:none;border-radius:12px;cursor:pointer;
+  }
+  .btn-continue{background:var(--jungle-light);color:#052e16;}
+  .btn-main{background:var(--accent-hot);color:#431407;}
+  .btn-cancel{background:#64748b;color:#fff;}
+</style>
+</head>
+<body>
+
+<!-- ======================= 1. MAIN MENU ======================= -->
+<section id="screen-menu" class="screen active">
+  <div class="top-score-corner">🏆 Highest score: <span id="highScore">0</span></div>
+  <div class="leaf">🌿🪲🌿</div>
+  <h1>BEETLE OR NOT?</h1>
+  <p class="tagline">A jungle photo quiz from the rainforests of Malaysia</p>
+  <div class="menu-buttons">
+    <button class="big-btn" id="btnNewGame">🌳 New Game</button>
+    <button class="big-btn about" id="btnAbout">📖 About</button>
+    <button class="big-btn exit" id="btnExit">🚪 Exit</button>
+  </div>
+  <div class="exit-note" id="exitNote"></div>
+</section>
+
+<!-- ======================= 2. GAME SCREEN ======================= -->
+<section id="screen-game" class="screen">
+  <div class="game-hud">
+    <span class="score-pill">Score: <span id="scoreVal">0</span> · Streak: <span id="streakVal">0</span></span>
+    <button class="menu-btn" id="btnInGameMenu">☰ Menu</button>
+  </div>
+  <div class="quiz-card">
+    <div class="question" id="questionText">Is this a beetle?</div>
+    <div class="photo" id="photoBox"></div>
+    <div class="photo-credit" id="photoCredit"></div>
+    <div class="answers" id="answerRow">
+      <button class="ans-btn ans-yes" id="ansYes">✔ Beetle!</button>
+      <button class="ans-btn ans-no" id="ansNo">✘ Not a beetle</button>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="species-name" id="speciesName"></div>
+    <div class="obs-info" id="obsInfo"></div>
+    <div class="streak-note" id="streakNote"></div>
+    <div class="wait-controls" id="waitControls" style="display:none;">
+      <span class="countdown" id="countdown"></span>
+      <button id="btnSkip">Next photo ▶</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 3. ABOUT SCREEN ======================= -->
+<section id="screen-about" class="screen">
+  <div class="leaf">📖🌿</div>
+  <h1>About</h1>
+  <div class="about-card">
+    <p>Just a goofy project by a beetle enthusiast. 🪲</p>
+    <p>All observations are chosen from the <b>genus</b>, <b>species</b>, or <b>subspecies</b> level — so every photo in the quiz comes from a properly named beetle (or impostor!) record. Look closely, trust your instincts, and remember: one wrong answer ends your streak!</p>
+  </div>
+  <button class="back-btn" id="btnBackMenu">⬅ Main Menu</button>
+</section>
+
+<!-- ======================= IN-GAME MENU OVERLAY ======================= -->
+<div class="overlay" id="overlayMenu">
+  <div class="panel">
+    <h2>⏸ Paused</h2>
+    <button class="btn-continue" id="btnContinue">▶ Continue</button>
+    <button class="btn-main" id="btnToMainMenu">🏠 Main Menu</button>
+  </div>
+</div>
+
+<!-- ======================= CONFIRM OVERLAY ======================= -->
+<div class="overlay" id="overlayConfirm">
+  <div class="panel">
+    <h2>End this round?</h2>
+    <p id="confirmScore" style="margin-bottom:8px;color:#bbf7d0;"></p>
+    <button class="btn-continue" id="btnReturnGame">↩ Return to Game</button>
+    <button class="btn-main" id="btnConfirmQuit">🏠 Return to Main Menu</button>
+    <button class="btn-cancel" id="btnCancelConfirm">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* ================= DATA =================
+   Live pool: research-grade iNaturalist observations of Coleoptera (taxon 47208)
+   and Heteroptera (taxon 61267) in Malaysia (place 7155), fetched at game start.
+   The curated list below is the offline fallback so the game never opens empty. */
+const INAT_URL = "https://api.inaturalist.org/v1/observations?taxon_id=47208,61267&place_id=7155&photos=true&quality_grade=research&identifications=most_agree&per_page=100";
+
+const observations = [
+  { isBeetle: true,  emoji: "🪲", name: "Chalcosoma atlas (Atlas beetle)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/760072452/medium.jpg",
+    credit: "Photo: zfengze, CC BY-NC, via iNaturalist",
+    info: "One of Southeast Asia's largest rhinoceros beetles. Males grow a huge pair of curved horns used to wrestle rivals on tree trunks." },
+  { isBeetle: true,  emoji: "🪲", name: "Cheirotonus peracanus",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/751273422/medium.jpg",
+    credit: "Photo: zhangtianyuan, CC BY-NC, via iNaturalist",
+    info: "A large, colourful scarab beetle with metallic green-and-orange patterning, found in Malaysian montane forests." },
+  { isBeetle: true,  emoji: "✨", name: "Prosopocoilus zebra (stag beetle)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/759725427/medium.jpg",
+    credit: "Photo: Rob Foster, CC BY, via iNaturalist",
+    info: "A striking stag beetle whose oversized, antler-like jaws are used by males to fight over sap sites." },
+  { isBeetle: true,  emoji: "🐞", name: "Coccinella transversalis (ladybird beetle)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/764929900/medium.jpg",
+    credit: "Photo: Amir2010, CC BY-NC, via iNaturalist",
+    info: "A transverse-banded ladybird that preys on aphids. It IS a beetle — ladybirds are beetles in the family Coccinellidae." },
+  { isBeetle: false, emoji: "🕷️", name: "Macracantha hasselti (spiny orb-weaver)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/684802791/medium.jpg",
+    credit: "Photo: Izz, CC BY-NC, via iNaturalist",
+    info: "A spider, not a beetle! Its hard orange shell and crab-like shape fool many people, but spiders have eight legs; beetles have six." },
+  { isBeetle: false, emoji: "🦗", name: "Phyllomimus unicolor (leaf cricket)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/753628732/medium.jpg",
+    credit: "Photo: Valentina L., CC BY-NC, via iNaturalist",
+    info: "A leaf-mimicking katydid. Its wing covers look like beetle shells, but the long hind legs give it away as a cricket." },
+  { isBeetle: false, emoji: "🐛", name: "Catacanthus incarnatus (man-faced bug)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/729791676/medium.jpg",
+    credit: "Photo: wongfookyee, CC BY-NC, via iNaturalist",
+    info: "A true bug (Heteroptera) famous for the face-like markings on its back. True bugs have piercing sucking mouthparts; beetles chew." },
+  { isBeetle: false, emoji: "💎", name: "Chrysocoris stollii (jewel bug)",
+    src: "https://inaturalist-open-data.s3.amazonaws.com/photos/698255279/medium.jpg",
+    credit: "Photo: Will II Bell, CC BY-NC, via iNaturalist",
+    info: "A metallic jewel bug (scutellerid). Its shiny enlarged scutellum resembles beetle wing covers, but it is a true bug." },
+];
+
+/* ================= SCREEN SWITCHING ================= */
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  const target = document.getElementById(id);
+  target.classList.add("active");
+  target.scrollIntoView({ behavior: "smooth" });
+}
+
+/* ================= GAME STATE ================= */
+let score = 0, streak = 0, highScore = 0;
+let current = null, answered = false;
+let timer = null, secondsLeft = 0;
+let deck = [];
+
+const el = id => document.getElementById(id);
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* Draw the next photo from a shuffled deck: nothing answered correctly repeats. */
+function drawPhoto() {
+  if (deck.length === 0) deck = shuffle(observations.slice());
+  return deck.pop();
+}
+
+/* Remove an answered-correct observation from the deck so it can't repeat this round. */
+function retirePhoto(obs) {
+  deck = deck.filter(o => o.src !== obs.src);
+}
+
+/* Build a live deck from iNaturalist: research-grade Coleoptera + Heteroptera in Malaysia.
+   Falls back silently to the curated list on any failure. */
+async function loadLiveObservations() {
+  try {
+    const res = await fetch(INAT_URL);
+    if (!res.ok) return;
+    const data = await res.json();
+    const live = [];
+    for (const r of (data.results || [])) {
+      const t = r.taxon;
+      const p = (r.photos || [])[0];
+      if (!t || !t.name || !p || !p.url) continue;
+      const anc = (t.ancestry || "").split("/");
+      const isBeetle = anc.includes("47208") && !anc.includes("61267");
+      const cc = p.license_code && p.license_code.toLowerCase() !== "none";
+      live.push({
+        isBeetle,
+        emoji: isBeetle ? "🪲" : "🐛",
+        name: t.name + (t.rank !== "species" ? " (" + t.rank + ")" : ""),
+        src: p.url.replace(/\/square\.jpe?g$/, "/medium.jpg"),
+        credit: p.attribution || "via iNaturalist",
+        info: "Research-grade iNaturalist observation from Malaysia, identified as " +
+              t.name + " (" + t.rank + " rank, " +
+              (isBeetle ? "order Coleoptera — a beetle" : "suborder Heteroptera — a true bug") + "). " +
+              (r.place_guess ? "Location: " + r.place_guess + ". " : "") +
+              (cc ? "Photo licensed " + p.license_code.toUpperCase() + "." : "Photo all rights reserved."),
+      });
+    }
+    if (live.length > 0) {
+      observations.length = 0;
+      observations.push(...live);
+    }
+  } catch (e) { /* offline or blocked: curated fallback stays */ }
+}
+
+function updateHud() {
+  el("scoreVal").textContent = score;
+  el("streakVal").textContent = streak;
+  el("highScore").textContent = highScore;
+}
+
+function setPhoto(obs) {
+  const box = el("photoBox");
+  box.innerHTML = "";
+  if (obs.src) {
+    const img = document.createElement("img");
+    img.src = obs.src;
+    img.alt = "Observation photo";
+    img.onerror = () => {
+      box.innerHTML = '<div class="fallback">' + obs.emoji + "</div>";
+    };
+    box.appendChild(img);
+    el("photoCredit").textContent = obs.credit;
+  } else {
+    box.innerHTML = '<div class="fallback">' + obs.emoji + "</div>";
+    el("photoCredit").textContent = "";
+  }
+}
+
+function nextPhoto() {
+  clearInterval(timer);
+  answered = false;
+  current = drawPhoto();
+  setPhoto(current);
+  el("verdict").textContent = "";
+  el("verdict").className = "verdict";
+  el("speciesName").textContent = "";
+  el("obsInfo").textContent = "";
+  el("streakNote").textContent = "";
+  el("waitControls").style.display = "none";
+  el("answerRow").style.display = "flex";
+  el("questionText").textContent = "Is this a beetle?";
+}
+
+function answer(isYes) {
+  if (answered) return;
+  answered = true;
+  clearInterval(timer);
+  const correct = (isYes === current.isBeetle);
+  if (correct) {
+    score += 10; streak += 1;
+    highScore = Math.max(highScore, score);
+    retirePhoto(current); // answered correctly: never repeats this round
+    el("verdict").textContent = "✅ Correct! It IS " + (current.isBeetle ? "a beetle!" : "not a beetle!");
+    el("verdict").className = "verdict right";
+    el("streakNote").textContent = "Streak: " + streak + " — keep going! 🌿";
+    setTimeout(nextPhoto, 1500);
+  } else {
+    streak = 0; // reset the streak
+    el("verdict").textContent = "❌ Wrong!";
+    el("verdict").className = "verdict wrong";
+    el("streakNote").textContent = "Your streak resets to 0. One more look…";
+    startWaitCountdown();
+  }
+  updateHud();
+  el("answerRow").style.display = "none";
+  // species name and info are shown whether the answer was right or wrong
+  el("speciesName").textContent = current.name;
+  el("obsInfo").textContent = current.info || "";
+}
+
+function startWaitCountdown() {
+  secondsLeft = 10;
+  el("waitControls").style.display = "flex";
+  el("countdown").textContent = "Next photo in " + secondsLeft + "s";
+  timer = setInterval(() => {
+    secondsLeft--;
+    if (secondsLeft <= 0) nextPhoto();
+    else el("countdown").textContent = "Next photo in " + secondsLeft + "s";
+  }, 1000);
+}
+
+el("ansYes").onclick = () => answer(true);
+el("ansNo").onclick = () => answer(false);
+el("btnSkip").onclick = () => { if (answered) nextPhoto(); };
+
+/* ================= MENU FLOW ================= */
+el("btnNewGame").onclick = async () => {
+  score = 0; streak = 0; deck = [];
+  updateHud();
+  showScreen("screen-game");
+  el("questionText").textContent = "Fetching observations from iNaturalist…";
+  el("photoBox").innerHTML = '<div class="fallback">🛰️</div>';
+  el("photoCredit").textContent = "";
+  await loadLiveObservations();
+  nextPhoto();
+};
+el("btnAbout").onclick = () => showScreen("screen-about");
+el("btnBackMenu").onclick = () => showScreen("screen-menu");
+
+/* ================= EXIT ================= */
+let exitNoteTimer = null;
+el("btnExit").onclick = () => {
+  // Browsers only let script close tabs they opened themselves.
+  window.close();
+  // If the tab is still here after a moment, the browser refused — tell the player for 5s.
+  setTimeout(() => {
+    if (!document.body.contains(el("exitNote"))) return;
+    const note = el("exitNote");
+    note.textContent = "This browser won't let the page close itself — you can close the tab (or the app) normally.";
+    clearTimeout(exitNoteTimer);
+    exitNoteTimer = setTimeout(() => { note.textContent = ""; }, 5000);
+  }, 400);
+};
+
+/* ================= IN-GAME MENU ================= */
+function endRound() {
+  clearInterval(timer);
+  highScore = Math.max(highScore, score);
+  updateHud();
+  showScreen("screen-menu");
+}
+function openOverlay(id) { el(id).classList.add("show"); }
+function closeOverlay(id) { el(id).classList.remove("show"); }
+
+el("btnInGameMenu").onclick = () => { clearInterval(timer); openOverlay("overlayMenu"); };
+el("btnContinue").onclick = () => {
+  closeOverlay("overlayMenu");
+  if (answered && el("waitControls").style.display !== "none" && secondsLeft > 0) startWaitCountdown();
+};
+el("btnToMainMenu").onclick = () => {
+  closeOverlay("overlayMenu");
+  el("confirmScore").textContent = "Your score this round: " + score + " (streak " + streak + ")";
+  openOverlay("overlayConfirm");
+};
+el("btnReturnGame").onclick = () => {
+  closeOverlay("overlayConfirm");
+  openOverlay("overlayMenu");
+};
+el("btnCancelConfirm").onclick = () => closeOverlay("overlayConfirm");
+el("btnConfirmQuit").onclick = () => {
+  closeOverlay("overlayConfirm");
+  endRound();
+};
+
+updateHud();
+</script>
+</body>
+</html>

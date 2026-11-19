@@ -389,7 +389,7 @@ function showScreen(id) {
 /* ================= GAME STATE ================= */
 let score = 0, highScore = 0;
 let current = null, answered = false;
-let timer = null, secondsLeft = 0, timerMode = null, timerRemainMs = 0; // mode: "photo" | "wait" | "auto"
+let timer = null, secondsLeft = 0, timerMode = null, timerRemainMs = 0, nextPhotoTimeout = null; // mode: "photo" | "wait" | "auto"
 let deck = [];
 
 const el = id => document.getElementById(id);
@@ -667,6 +667,8 @@ function answer(isYes) {
   if (answered) return;
   answered = true;
   clearInterval(timer);
+  cancelAnimationFrame(timer); // the photo timer runs on rAF — stop it too
+  timer = null;
   const correct = (isYes === current.isBeetle);
   if (correct) {
     score += 1;
@@ -675,7 +677,8 @@ function answer(isYes) {
     setTimerBar(0, "", true); // snap the bar to zero right away
     el("verdict").textContent = "✅ Correct! It IS " + (current.isBeetle ? "a beetle!" : "not a beetle!");
     el("verdict").className = "verdict right";
-    setTimeout(nextPhoto, 1500);
+    clearTimeout(nextPhotoTimeout);
+    nextPhotoTimeout = setTimeout(nextPhoto, 1500);
   } else {
     el("verdict").textContent = "❌ Wrong!";
     el("verdict").className = "verdict wrong";
@@ -713,10 +716,18 @@ function startWaitCountdown() {
   }, 1000);
 }
 
+/* Stop every timer mechanism: rAF loop, interval, and timeouts. */
+function stopAllTimers() {
+  clearInterval(timer);
+  cancelAnimationFrame(timer);
+  timer = null;
+  clearTimeout(nextPhotoTimeout);
+}
+
 el("ansYes").onclick = () => answer(true);
 el("ansNo").onclick = () => answer(false);
-el("btnSkip").onclick = () => { clearInterval(timer); endRound(); }; // Main Menu after a round ends
-el("btnRoundNewGame").onclick = () => { clearInterval(timer); el("waitControls").style.display = "none"; startNewGame(); };
+el("btnSkip").onclick = () => { stopAllTimers(); endRound(); }; // Main Menu after a round ends
+el("btnRoundNewGame").onclick = () => { stopAllTimers(); el("waitControls").style.display = "none"; startNewGame(); };
 
 /* ================= MENU FLOW ================= */
 async function startNewGame() {

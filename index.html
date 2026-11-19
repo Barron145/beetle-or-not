@@ -391,7 +391,7 @@ function showScreen(id) {
 /* ================= GAME STATE ================= */
 let score = 0, highScore = 0;
 let current = null, answered = false;
-let timer = null, secondsLeft = 0;
+let timer = null, secondsLeft = 0, timerMode = null; // mode: "photo" | "wait" | "auto"
 let deck = [];
 
 const el = id => document.getElementById(id);
@@ -573,6 +573,7 @@ function nextPhoto() {
    If time runs out, the round wraps up immediately. */
 function startPhotoTimer() {
   secondsLeft = 10;
+  timerMode = "photo";
   setTimerBar(0, "⏱ " + secondsLeft + "s", true); // instant reset each photo
   timer = setInterval(() => {
     secondsLeft--;
@@ -638,7 +639,9 @@ function timeUp() {
 /* 10s to read the result, then the main menu is shown automatically.
    The player can jump there sooner with the buttons below. */
 function startAutoReturn() {
+  clearInterval(timer);
   secondsLeft = 10;
+  timerMode = "auto";
   el("waitControls").style.display = "flex";
   el("btnSkip").textContent = "🏠 Main Menu";
   el("countdown").textContent = "Back to menu in " + secondsLeft + "s";
@@ -686,6 +689,7 @@ function answer(isYes) {
 function startWaitCountdown() {
   clearInterval(timer); // replace any running timer
   secondsLeft = 10;
+  timerMode = "wait";
   // reuse the same bar, amber mode, beetle walks back as the wait drains
   el("timerBar").classList.add("wait");
   el("timerBar").style.display = "block";
@@ -777,14 +781,53 @@ function endRound() {
 function openOverlay(id) { el(id).classList.add("show"); }
 function closeOverlay(id) { el(id).classList.remove("show"); }
 
-el("btnInGameMenu").onclick = () => { clearInterval(timer); openOverlay("overlayMenu"); };
+el("btnInGameMenu").onclick = () => {
+  // pause instantly: stop the interval and freeze the bar where it is
+  clearInterval(timer);
+  timer = null;
+  if (timerMode === "photo") {
+    // freeze the fill at its current width with no transition
+    const fill = el("timerFill");
+    const elapsed = 10 - secondsLeft;
+    fill.style.transition = "none";
+    fill.style.width = (elapsed * 10) + "%";
+  }
+  openOverlay("overlayMenu");
+};
 el("btnContinue").onclick = () => {
   closeOverlay("overlayMenu");
-  if (answered && el("timerBar").style.display !== "none" && secondsLeft > 0) {
-    startWaitCountdown(); // resuming a wrong-answer wait
-  } else if (!answered) {
-    startPhotoTimer(); // resuming the question timer
+  if (!answered) {
+    // resume the question timer from where it paused
+    if (timerMode !== "photo" || secondsLeft <= 0) return; // nothing to resume
+    setTimerBar((10 - secondsLeft) * 10, "⏱ " + secondsLeft + "s", true);
+    timer = setInterval(() => {
+      secondsLeft--;
+      const elapsed = 10 - secondsLeft;
+      if (secondsLeft <= 0) {
+        clearInterval(timer);
+        setTimerBar(100, "⏱ 0s");
+        timeUp();
+      } else {
+        setTimerBar(elapsed * 10, "⏱ " + secondsLeft + "s");
+      }
+    }, 1000);
+  } else if (timerMode === "wait" && secondsLeft > 0) {
+    // resume the wrong-answer wait from where it paused
+    el("timerBar").classList.add("wait");
+    el("timerBar").style.display = "block";
+    el("waitControls").style.display = "flex";
+    setTimerBar(secondsLeft * 10, "Next photo in " + secondsLeft + "s", true);
+    timer = setInterval(() => {
+      secondsLeft--;
+      if (secondsLeft <= 0) {
+        el("timerBar").classList.remove("wait");
+        nextPhoto();
+      } else {
+        setTimerBar(secondsLeft * 10, "Next photo in " + secondsLeft + "s");
+      }
+    }, 1000);
   }
+  // if timerMode is "auto" (round already ended), Continue does nothing to the timer
 };
 el("btnToMainMenu").onclick = () => {
   closeOverlay("overlayMenu");

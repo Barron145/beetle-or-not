@@ -389,7 +389,7 @@ function showScreen(id) {
 /* ================= GAME STATE ================= */
 let score = 0, highScore = 0;
 let current = null, answered = false;
-let timer = null, secondsLeft = 0, timerMode = null, timerDeadline = 0; // mode: "photo" | "wait" | "auto"
+let timer = null, secondsLeft = 0, timerMode = null, timerRemainMs = 0; // mode: "photo" | "wait" | "auto"
 let deck = [];
 
 const el = id => document.getElementById(id);
@@ -569,24 +569,30 @@ function nextPhoto() {
 
 /* 10 seconds per photo: a bar fills up while a beetle crawls across.
    If time runs out, the round wraps up immediately. */
+/* Timer bar driven by requestAnimationFrame: 60fps-smooth movement, and the
+   exact remaining milliseconds are always recoverable for pause/resume. */
 function startPhotoTimer() {
   secondsLeft = 10;
+  timerRemainMs = secondsLeft * 1000;
   timerMode = "photo";
-  timerDeadline = Date.now() + secondsLeft * 1000; // exact expiry instant
   setTimerBar(0, "⏱ " + secondsLeft + "s", true); // instant reset each photo
-  timer = setInterval(() => {
-    const remaining = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
-    secondsLeft = remaining;
-    const elapsedPct = Math.min(100, ((Date.now() - (timerDeadline - 10000)) / 10000) * 100);
-    if (remaining <= 0) {
-      clearInterval(timer);
+  let lastFrame = Date.now();
+  const tick = () => {
+    const now = Date.now();
+    timerRemainMs = Math.max(0, timerRemainMs - (now - lastFrame));
+    lastFrame = now;
+    secondsLeft = Math.ceil(timerRemainMs / 1000);
+    const elapsedPct = Math.min(100, (1 - timerRemainMs / 10000) * 100);
+    if (timerRemainMs <= 0) {
       timer = null;
       setTimerBar(100, "⏱ 0s", true);
       timeUp();
     } else {
-      setTimerBar(elapsedPct, "⏱ " + remaining + "s");
+      setTimerBar(elapsedPct, "⏱ " + secondsLeft + "s");
+      timer = requestAnimationFrame(tick);
     }
-  }, 100); // 100ms tick: bar moves smoothly and pause captures the exact instant
+  };
+  timer = requestAnimationFrame(tick);
 }
 
 function setTimerBar(pct, text, instant) {
@@ -783,39 +789,43 @@ function openOverlay(id) { el(id).classList.add("show"); }
 function closeOverlay(id) { el(id).classList.remove("show"); }
 
 el("btnInGameMenu").onclick = () => {
-  // pause instantly: compute the exact remaining time at THIS click instant,
-  // stop the interval, and freeze the bar there with no transition
+  // pause instantly: the rAF loop keeps timerRemainMs exact to the frame;
+  // cancel it and freeze the bar there
   if (timerMode === "photo" && timer) {
-    secondsLeft = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
-    const elapsedPct = Math.min(100, ((Date.now() - (timerDeadline - 10000)) / 10000) * 100);
-    const fill = el("timerFill");
-    fill.style.transition = "none";
-    fill.style.width = elapsedPct + "%";
+    cancelAnimationFrame(timer);
+    timer = null;
+    secondsLeft = Math.ceil(timerRemainMs / 1000);
+    const elapsedPct = Math.min(100, (1 - timerRemainMs / 10000) * 100);
+    el("timerFill").style.width = elapsedPct + "%";
+  } else {
+    clearInterval(timer);
+    timer = null;
   }
-  clearInterval(timer);
-  timer = null;
   openOverlay("overlayMenu");
 };
 el("btnContinue").onclick = () => {
   closeOverlay("overlayMenu");
   if (!answered) {
-    // resume the question timer: rebuild the deadline from the frozen remainder
-    if (timerMode !== "photo" || secondsLeft <= 0) return; // nothing to resume
-    timerDeadline = Date.now() + secondsLeft * 1000;
-    setTimerBar((10 - secondsLeft) * 10, "⏱ " + secondsLeft + "s", true);
-    timer = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
-      secondsLeft = remaining;
-      const elapsedPct = Math.min(100, ((Date.now() - (timerDeadline - 10000)) / 10000) * 100);
-      if (remaining <= 0) {
-        clearInterval(timer);
+    // resume the question timer from the exact frozen remainder (no rounding loss)
+    if (timerMode !== "photo" || timerRemainMs <= 0) return; // nothing to resume
+    setTimerBar(Math.min(100, (1 - timerRemainMs / 10000) * 100), "⏱ " + Math.ceil(timerRemainMs / 1000) + "s", true);
+    let lastFrame = Date.now();
+    const tick = () => {
+      const now = Date.now();
+      timerRemainMs = Math.max(0, timerRemainMs - (now - lastFrame));
+      lastFrame = now;
+      secondsLeft = Math.ceil(timerRemainMs / 1000);
+      const elapsedPct = Math.min(100, (1 - timerRemainMs / 10000) * 100);
+      if (timerRemainMs <= 0) {
         timer = null;
         setTimerBar(100, "⏱ 0s", true);
         timeUp();
       } else {
-        setTimerBar(elapsedPct, "⏱ " + remaining + "s");
+        setTimerBar(elapsedPct, "⏱ " + secondsLeft + "s");
+        timer = requestAnimationFrame(tick);
       }
-    }, 100);
+    };
+    timer = requestAnimationFrame(tick);
   } else if (timerMode === "wait" && secondsLeft > 0) {
     // resume the wrong-answer wait from where it paused
     el("timerBar").classList.add("wait");
